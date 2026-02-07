@@ -1,4 +1,4 @@
-﻿# Avito.ma cars Scraper 🚗
+﻿# Avito.ma cars Scraper
 
 This project contains **two complementary web scrapers** designed to collect car listings data from **Avito.ma** efficiently
 
@@ -8,7 +8,7 @@ The idea is simple:
 
 This architecture avoids unnecessary requests while still allowing full data extraction when needed.
 ---
-## 🧠 Project Architecture
+## Project Architecture
 
 ### 1️⃣ Light Scraper (Listings Page Scraper)
 
@@ -92,3 +92,4 @@ python standard_scraper.py
 
 **👤 Author**
 *Ahmed Baba*
+
