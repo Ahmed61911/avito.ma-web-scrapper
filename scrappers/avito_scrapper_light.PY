@@ -1,8 +1,6 @@
 import requests
 from bs4 import BeautifulSoup as bs
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
 import time
 
 # where we gonna store the listings
