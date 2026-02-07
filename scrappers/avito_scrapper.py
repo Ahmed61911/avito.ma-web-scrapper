@@ -1,75 +1,118 @@
 import requests
 import pandas as pd
 from bs4 import BeautifulSoup as bs
+import numpy as np
+import time
+import re
 
-ALL_LISTINGS = []
-TOTAL = 0
-PAGES = 3
+# Where we will store our scrapped links
+LINKS = []
+#Number of pages we want to scrape
+PAGES = 10    
 
-for PAGE in range(1, PAGES):
+# Itterating over the pages
+for PAGE in range(1, PAGES + 1):
+    # Setting up the Target and accessing the website
     TARGET_URL = f'https://www.avito.ma/fr/maroc/voitures?o={PAGE}'
     HEADERS = {'user-agent' : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"}
     RESPONSE = requests.get(TARGET_URL, headers=HEADERS)
     PAGE_CONTENT = bs(RESPONSE.content, "html.parser")
     LISTINGS = PAGE_CONTENT.find_all("a", class_="sc-1jge648-0")
 
+    # Getting the link of each listing and append it to out listings list
     for LISTING in LISTINGS:
-
-        TITLE = LISTING.find("p" , class_="sc-1x0vz2r-0 iHApav")
-        TITLE = TITLE.text.strip() if TITLE else "N/A"
-
-        TYPE_LOCATION = LISTING.find("div", class_="sc-b57yxx-10 fHMeoC")
-        TYPE_LOCATION = TYPE_LOCATION.text.strip() if TYPE_LOCATION else "N/A"
-        TYPE_LOCATION = TYPE_LOCATION.split(" dans ")
-        TYPE = TYPE_LOCATION[0]
-        LOCATION = TYPE_LOCATION[1]
-
-        DATE = LISTING.find("p", class_="sc-1x0vz2r-0 layWaX")
-        DATE = DATE.text.strip() if DATE else "N/A"
-        
-        TAGS = LISTING.find_all("span", class_="sc-1s278lr-0 cAiIZZ")
-        TAGS = [TAG.text.strip() for TAG in TAGS] if TAGS else []
-        try :
-            YEAR = TAGS[0]
-            TRANSMISSION = TAGS[1]
-            FUEL = TAGS[2]
-        except IndexError:
-            YEAR = "N/A"
-            TRANSMISSION = "N/A"
-            FUEL = "N/A"
-
-        IMAGE_TAG = LISTING.find("img", class_="sc-1lb3x1r-3")
-        if IMAGE_TAG:
-            if IMAGE_TAG.get("data-src"):
-                IMAGE = IMAGE_TAG["data-src"]
-            elif IMAGE_TAG.get("data-srcset"):
-                IMAGE = IMAGE_TAG["data-srcset"].split(" ")[0]
-            elif IMAGE_TAG.get("src"):
-                IMAGE = IMAGE_TAG["src"]
-            else:
-                IMAGE = "N/A"
-
-        OWNER = LISTING.find("p", class_="sc-1x0vz2r-0 hNCqYw sc-5rosa-7 hHZQmC")
-        OWNER = OWNER.text.strip() if OWNER else "-"
-
         LINK = LISTING.get("href") if LISTING and LISTING.get("href") else "N/A"
-        
-        ALL_LISTINGS.append({
-            "type_annonce" : TYPE,
-            "titre" : TITLE,
-            "location" : LOCATION,
-            "date" : DATE,
-            "tags": TAGS,
-            "modele" : YEAR,
-            "transsmission" : TRANSMISSION,
-            "carburant" : FUEL,
-            "image" : IMAGE,
-            "propriétere" : OWNER,
-            "link" : LINK
-        })
+        LINKS = np.append(LINKS, LINK)
 
-        TOTAL += 1
-        
-print(TOTAL)
-DF = pd.DataFrame(ALL_LISTINGS)
-DF.to_csv("Listings.csv", index = False)
+# Dropping duplicat links
+link_sr = pd.Series(LINKS)
+link_sr = link_sr.drop_duplicates().reset_index(drop=True)
+
+# Array of links
+links = np.array(link_sr) 
+listings = []
+headers = {"user-agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36")}
+#Itterating over the links we got
+for link in links:
+    response = requests.get(link, headers=headers, timeout=10)
+    page = bs(response.content, "html.parser")
+    # Link
+    listing = {"lien": link}
+
+    # Listing title
+    title = page.find("h1", class_="sc-16573058-5 izVEJU")
+    listing["titre_annonce"] = title.text.strip() if title else None
+
+    # Price
+    price = page.find("div", class_="sc-16573058-10 kRLGQQ")
+    listing["prix"] = price.text.strip() if price else None
+
+    # Address & date
+    spans = page.find_all("span", class_="sc-16573058-17 gLkxLA")
+    listing["spans"] = [span.text.strip() for span in spans] if spans else None
+
+    # Owner
+    owner = page.find("p",class_="sc-1x0vz2r-0 fUTtTl sc-1l0do2b-9 bJuYLD")
+    listing["proprietere"] = owner.text.strip() if owner else None
+
+    # Tags
+    spans = page.find_all("span", class_="sc-1x0vz2r-0 fjZBup")
+    listing["tags"] = [span.text.strip() for span in spans] if spans else None
+    # Images
+    listing["images"] = [img.get("src") for img in page.find_all("img", class_="sc-1gjavk-0 fpXQoT") if img.get("src")] if page.find_all("img", class_="sc-1gjavk-0 fpXQoT") else None
+    
+    # Append listing to listings array
+    listings.append(listing)
+
+    # Waiting a bit so we dont get banned (skiped, im willing to take the risk lol)
+    #time.sleep(1.5)
+    
+# price cleaning
+def clean_price(x):
+    # Remove anything that is not a digit
+    x = re.sub(r"[^\d]", "", x)
+    return int(x) if x.isdigit() else None
+
+# Mileage cleaning
+def clean_mileage(tags):
+    if not tags or len(tags) <= 4:
+        return np.nan
+    val = tags[4].strip().lower()
+    val = re.sub(r"[^\d]", "", val)
+    return int(val) if val.isdigit() else np.nan
+
+# Setting up the dataFrame and feed it our listings list
+df_raw = pd.DataFrame(listings)
+df_clean = df_raw.copy()
+
+# Dividing 'spans' column into 'ville', 'quartier', 'date'
+df_clean["ville"] = df_clean["spans"].apply(lambda x: x[0].split(",")[1].strip().lower() if len(x) > 0 and len(x[0].split(",")) > 1 else None)
+df_clean["quartier"] = df_clean["spans"].apply(lambda x: x[0].split(",")[0].strip().lower() if len(x) > 0 else None)
+df_clean['date'] = df_clean['spans'].apply(lambda x : x[1].lstrip("il y a ").lower() if len(x) > 1 else None)
+
+# cleaning price Column
+df_clean['prix'] = df_clean['prix'].apply(clean_price)
+
+# Dividing 'tags' column into 'category', 'annee', 'transsmission', 'carburant', 'kilometrage', 'marque', 'modele', 'equipements'
+df_clean['category'] = df_clean['tags'].apply(lambda x : x[0].split(",")[0].strip().lower() if len(x) > 0 else None)
+df_clean['type_annonce'] = df_clean['tags'].apply(lambda x : x[0].split(",")[1].strip().lower() if len(x) > 0 else None)
+df_clean['annee'] = df_clean['tags'].apply(lambda x : int(x[1].strip()) if len(x) > 1 else None)
+df_clean['transmission'] = df_clean['tags'].apply(lambda x : x[2].strip().lower() if len(x) > 2 else None)
+df_clean['carburant'] = df_clean['tags'].apply(lambda x : x[3].strip().lower() if len(x) > 3 else None)
+df_clean['kilometrage'] = df_clean['tags'].apply(clean_mileage)
+df_clean['marque'] = df_clean['tags'].apply(lambda x : x[5].strip().lower() if len(x) > 5 else None)
+df_clean['modele'] = df_clean['tags'].apply(lambda x : x[6].strip().lower() if len(x) > 6 else None)
+df_clean['equipements'] = df_clean['tags'].apply(lambda x : [e.strip().lower() for e in x[7:]] if len(x) > 7 else None)
+
+# Dropping 'tags' and 'spans' columns 
+df_clean = df_clean.drop(columns=['tags', 'spans'])
+
+# Organizing the columns
+df_clean = df_clean.reset_index(drop=True)
+df_clean = df_clean[['titre_annonce', 'type_annonce', 'ville' ,'quartier' , 'prix', 'marque', 'modele', 'annee', 'kilometrage', 'carburant', 'transmission', 'equipements', 'date', 'proprietere', 'images', 'lien']]
+
+# Saving the fnale result
+df_clean.to_csv("../data/avito_listings.csv")
+
+# Counting finale
+df_clean.count()

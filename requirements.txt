@@ -1,25 +1,4 @@
-page 1 scraped in 0.93s
-page 2 scraped in 1.57s
-page 3 scraped in 0.92s
-page 4 scraped in 1.52s
-page 5 scraped in 1.50s
-page 6 scraped in 1.03s
-page 7 scraped in 1.37s
-page 8 scraped in 1.09s
-page 9 scraped in 0.84s
-page 10 scraped in 1.16s
-page 11 scraped in 1.10s
-page 12 scraped in 1.09s
-page 13 scraped in 0.90s
-page 14 scraped in 0.94s
-page 15 scraped in 0.83s
-page 16 scraped in 0.88s
-page 17 scraped in 2.14s
-page 18 scraped in 1.35s
-page 19 scraped in 1.15s
-page 20 scraped in 1.43s
-page 21 scraped in 3.49s
-page 22 scraped in 1.03s
-page 23 scraped in 1.48s
-page 24 scraped in 1.23s
-page 25 scraped in 1.51s
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+pandas>=2.0.0
+numpy>=1.24.0
