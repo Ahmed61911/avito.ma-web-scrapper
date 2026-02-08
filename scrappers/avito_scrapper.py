@@ -162,4 +162,4 @@ try:
     df_clean.to_csv("data/avito_listings.csv" , index= False)
     print(f"{GREEN}💾 Saved to: data/avito_listings.csv{RESET}")
 except e:
-    print(f"{RED}❌ Error occurued saving the data: {e}{RESET}")g
+    print(f"{RED}❌ Error occurued saving the data: {e}{RESET}")
