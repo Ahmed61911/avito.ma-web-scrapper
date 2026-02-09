@@ -16,15 +16,16 @@ RESET = '\033[0m' # Resetting the orifinal color of the terminal
 
 # Where we will store our scrapped links
 links = []
+failed_links = []
 #Number of pages we want to scrape
-pages = 1 
+pages = 40 
 
 # Clearing the terminal and showing progress
 os.system('cls')
 print(f"{YELLOW}\n[1/4] Scraping listing links...{RESET}")
 
 # Itterating over the pages
-for page in range(1, pages + 1):
+for page in tqdm(range(1, pages + 1), desc=f"{BLUE}Scraping pages{RESET}", unit="page"):
     # Setting up the Target and accessing the website
     target_url = f'https://www.avito.ma/fr/maroc/voitures?o={page}'
     header = {'user-agent' : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"}
@@ -49,7 +50,7 @@ for page in range(1, pages + 1):
             requests.failed_links.append(link)
             tqdm.write(f"{RED}❌ Request failed: {link} ({e}){RESET}")
     
-    print(f"{GREEN}→ page {page} done, {len(listings)} listings found{RESET}")
+    #print(f"{GREEN}→ page {page} done, {len(listings)} listings found{RESET}")
 
 # Dropping duplicat links
 link_sr = pd.Series(links)
@@ -96,16 +97,11 @@ for link in tqdm(links, desc=f"{BLUE}Scraping listings{RESET}", unit="listing"):
         listings.append(listing)
 
         # Waiting a bit so we dont get banned (skiped, im willing to take the risk lol)
-        #time.sleep(1.5)
+        time.sleep(1.0)
 
     # Error handlers for timeout and failed requests
-    except requests.ReadTimeout:
-            requests.failed_links.append(link)
-            tqdm.write(f"{RED}⚠️ Timeout, skipped: {link}{RESET}")
-
-    except requests.RequestException as e:
-        requests.failed_links.append(link)
-        tqdm.write(f"{RED}❌ Request failed: {link} ({e}){RESET}")
+    except Exception as e:
+            tqdm.write(f"{RED}⚠️ Failed, skipped: {link} \nError:{e}{RESET}")
 
 print(f"{GREEN}✅ Scraping completed successfully!{RESET}")
 
@@ -125,41 +121,45 @@ def clean_mileage(tags):
 
 # Setting up the dataFrame and feed it our listings list
 df_raw = pd.DataFrame(listings)
+df_raw.to_csv('data/listings_raw.csv', index=False)
 df_clean = df_raw.copy()
 print(f"\n{YELLOW}[3/4] Cleaning & structuring data...{RESET}")
+try:
+    # Dividing 'spans' column into 'ville', 'quartier', 'date'
+    df_clean["ville"] = df_clean["spans"].apply(lambda x: x[0].split(",")[1].strip().lower() if len(x) > 0 and len(x[0].split(",")) > 1 else None)
+    df_clean["quartier"] = df_clean["spans"].apply(lambda x: x[0].split(",")[0].strip().lower() if len(x) > 0 else None)
+    df_clean['date'] = df_clean['spans'].apply(lambda x : x[1].lstrip("il y a ").lower() if len(x) > 1 else None)
 
-# Dividing 'spans' column into 'ville', 'quartier', 'date'
-df_clean["ville"] = df_clean["spans"].apply(lambda x: x[0].split(",")[1].strip().lower() if len(x) > 0 and len(x[0].split(",")) > 1 else None)
-df_clean["quartier"] = df_clean["spans"].apply(lambda x: x[0].split(",")[0].strip().lower() if len(x) > 0 else None)
-df_clean['date'] = df_clean['spans'].apply(lambda x : x[1].lstrip("il y a ").lower() if len(x) > 1 else None)
+    # cleaning price Column
+    df_clean['prix'] = df_clean['prix'].apply(clean_price)
 
-# cleaning price Column
-df_clean['prix'] = df_clean['prix'].apply(clean_price)
+    # Dividing 'tags' column into 'category', 'annee', 'transsmission', 'carburant', 'kilometrage', 'marque', 'modele', 'equipements'
+    df_clean['category'] = df_clean['tags'].apply(lambda x : x[0].split(",")[0].strip().lower() if len(x) > 0 else None)
+    df_clean['type_annonce'] = df_clean['tags'].apply(lambda x : x[0].split(",")[1].strip().lower() if len(x) > 0 else None)
+    df_clean['annee'] = df_clean['tags'].apply(lambda x : int(x[1].strip()) if len(x) > 1 else None)
+    df_clean['transmission'] = df_clean['tags'].apply(lambda x : x[2].strip().lower() if len(x) > 2 else None)
+    df_clean['carburant'] = df_clean['tags'].apply(lambda x : x[3].strip().lower() if len(x) > 3 else None)
+    df_clean['kilometrage'] = df_clean['tags'].apply(clean_mileage)
+    df_clean['marque'] = df_clean['tags'].apply(lambda x : x[5].strip().lower() if len(x) > 5 else None)
+    df_clean['modele'] = df_clean['tags'].apply(lambda x : x[6].strip().lower() if len(x) > 6 else None)
+    df_clean['equipements'] = df_clean['tags'].apply(lambda x : [e.strip().lower() for e in x[7:]] if len(x) > 7 else None)
 
-# Dividing 'tags' column into 'category', 'annee', 'transsmission', 'carburant', 'kilometrage', 'marque', 'modele', 'equipements'
-df_clean['category'] = df_clean['tags'].apply(lambda x : x[0].split(",")[0].strip().lower() if len(x) > 0 else None)
-df_clean['type_annonce'] = df_clean['tags'].apply(lambda x : x[0].split(",")[1].strip().lower() if len(x) > 0 else None)
-df_clean['annee'] = df_clean['tags'].apply(lambda x : int(x[1].strip()) if len(x) > 1 else None)
-df_clean['transmission'] = df_clean['tags'].apply(lambda x : x[2].strip().lower() if len(x) > 2 else None)
-df_clean['carburant'] = df_clean['tags'].apply(lambda x : x[3].strip().lower() if len(x) > 3 else None)
-df_clean['kilometrage'] = df_clean['tags'].apply(clean_mileage)
-df_clean['marque'] = df_clean['tags'].apply(lambda x : x[5].strip().lower() if len(x) > 5 else None)
-df_clean['modele'] = df_clean['tags'].apply(lambda x : x[6].strip().lower() if len(x) > 6 else None)
-df_clean['equipements'] = df_clean['tags'].apply(lambda x : [e.strip().lower() for e in x[7:]] if len(x) > 7 else None)
+    # Dropping 'tags' and 'spans' columns 
+    df_clean = df_clean.drop(columns=['tags', 'spans'])
 
-# Dropping 'tags' and 'spans' columns 
-df_clean = df_clean.drop(columns=['tags', 'spans'])
+    # Organizing the columns
+    df_clean = df_clean.reset_index(drop=True)
+    df_clean = df_clean[['titre_annonce', 'type_annonce', 'ville' ,'quartier' , 'prix', 'marque', 'modele', 'annee', 'kilometrage', 'carburant', 'transmission', 'equipements', 'date', 'proprietere', 'images', 'lien']]
+    print(f"{GREEN}📦 Total listings collected: {len(df_clean)}{RESET}")
 
-# Organizing the columns
-df_clean = df_clean.reset_index(drop=True)
-df_clean = df_clean[['titre_annonce', 'type_annonce', 'ville' ,'quartier' , 'prix', 'marque', 'modele', 'annee', 'kilometrage', 'carburant', 'transmission', 'equipements', 'date', 'proprietere', 'images', 'lien']]
-print(f"{GREEN}📦 Total listings collected: {len(df_clean)}{RESET}")
+except Exception as e:
+    tqdm.write(f"{RED}⚠️ Error occured during data structuring and formatting:{e}{RESET}")
 
 # Saving the fnale result
 print(f"\n{YELLOW}[4/4] Saving CSV...{RESET}")
 
 try:
-    df_clean.to_csv("data/avito_listings.csv" , index= False)
+    df_clean.to_csv("data/listings.csv" , index= False)
     print(f"{GREEN}💾 Saved to: data/avito_listings.csv{RESET}")
 except e:
     print(f"{RED}❌ Error occurued saving the data: {e}{RESET}")

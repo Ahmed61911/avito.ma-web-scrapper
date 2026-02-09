@@ -91,4 +91,4 @@ df = df.reset_index(drop=True)
 df = df[['titre', 'type_annonce','ville' ,'quartier', 'annee', 'carburant', 'transmission', 'date', 'proprietere', 'lien']]
 
 # Saving the final result
-df.to_csv("../data/avito_listings_light.csv", index=0)
+df.to_csv("data/avito_listings_light.csv", index=0)
