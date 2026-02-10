@@ -18,7 +18,7 @@ RESET = '\033[0m' # Resetting the orifinal color of the terminal
 links = []
 failed_links = []
 #Number of pages we want to scrape
-pages = 40 
+pages = 300 
 
 # Clearing the terminal and showing progress
 os.system('cls')
@@ -97,7 +97,7 @@ for link in tqdm(links, desc=f"{BLUE}Scraping listings{RESET}", unit="listing"):
         listings.append(listing)
 
         # Waiting a bit so we dont get banned (skiped, im willing to take the risk lol)
-        time.sleep(1.0)
+        #time.sleep(1.0)
 
     # Error handlers for timeout and failed requests
     except Exception as e:
