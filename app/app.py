@@ -32,46 +32,46 @@ year = st.selectbox("Année", years)
 fuel_types = df['carburant'].dropna().unique()
 fuel = st.selectbox("Type de carburant", fuel_types)
 
+
+car_df = pd.DataFrame([{
+        'marque': brand,
+        'modele': model,
+        'car_age': 2026 - year,
+        'carburant': fuel
+        # 'kilometrage': mileage
+    }])
+
+# Predictions
+line_pred = linear_model.predict(car_df)[0]
+rf_pred = rf_model.predict(car_df)[0]
+dt_pred = dt_model.predict(car_df)[0]
+kn_pred = kn_model.predict(car_df)[0]
+mean_price = (line_pred + rf_pred + dt_pred + kn_pred) / 4
+max_price = mean_price + 0.1 * mean_price
+min_price = mean_price - 0.1 * mean_price
+
 st.space()
 
 # Predicting the price
 if st.button("Estimer le prix"):
-    car_df = pd.DataFrame([{
-        'marque': brand,
-        'modele': model,
-        'car_age': 2026 - year,
-        'carburant': fuel
-        # 'kilometrage': mileage
-    }])
-
-    # Predictions
-    line_pred = linear_model.predict(car_df)[0]
-    rf_pred = rf_model.predict(car_df)[0]
-    dt_pred = dt_model.predict(car_df)[0]
-    kn_pred = kn_model.predict(car_df)[0]
-    mean_price = (line_pred + rf_pred + dt_pred + kn_pred) / 4
-    max_price = mean_price + 0.1 * mean_price
-    min_price = mean_price - 0.1 * mean_price
+    
     st.subheader("Prix éstimé:")
     st.write(f"Vous devez payer entre: {round(min_price):,} DH et {round(max_price):,} DH.")
+    st.space()
+
 st.space()
+    
+# Showing suggestions
+if st.checkbox("Afficher les suggestions:"):
+    car_listings = df[(df['prix'] >= min_price) & (df['prix'] <= max_price) & (df['modele'] == model)]
+    car_listings = car_listings.dropna(subset=['modele', 'annee', 'lien']).tail(5)
+    st.write(f"Sugesstion des annonces {brand} {model}:")
+    for _, listing in car_listings.iterrows():
+        st.markdown(f"- [Voir l'annonce]({listing['lien']})")
+    st.space()
+
 # showing results
 if st.checkbox("Afficher le resultat par model:"):
-    car_df = pd.DataFrame([{
-        'marque': brand,
-        'modele': model,
-        'car_age': 2026 - year,
-        'carburant': fuel
-        # 'kilometrage': mileage
-    }])
-
-    line_pred = linear_model.predict(car_df)[0]
-    rf_pred = rf_model.predict(car_df)[0]
-    dt_pred = dt_model.predict(car_df)[0]
-    kn_pred = kn_model.predict(car_df)[0]
-    mean_price = (line_pred + rf_pred + dt_pred + kn_pred) / 4
-    max_price = mean_price + 0.1 * mean_price
-    min_price = mean_price - 0.1 * mean_price
 
     st.write(f"**Modéle Rgression linéere:** {round(line_pred):,} DH")
     st.write(f"**Modéle Random Forest:** {round(rf_pred):,} DH")
@@ -79,6 +79,7 @@ if st.checkbox("Afficher le resultat par model:"):
     st.write(f"**Modéle K-Nearest Neighbors:** {round(kn_pred):,} DH")
 
     st.space()
+
 # Showing additinal data about the price of the model chosen through the years 
 if st.checkbox("Afficher les prix de ce modéle selon l'année:"):
     st.write(f"fluctuation du prix de {brand} {model}:")
@@ -86,7 +87,9 @@ if st.checkbox("Afficher les prix de ce modéle selon l'année:"):
     prices = prices[(prices['marque'] == brand) & (prices['modele'] == model)]
     prices = prices.groupby('annee')['prix'].median().sort_index()
     st.line_chart(prices)
-
+    st.space()
+    st.line_chart(prices)
+    
 st.space()
 st.space()
 
